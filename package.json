@@ -1,0 +1,21 @@
+{
+  "name": "inertiion",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:thankyouthatscool/inertiion.git",
+  "author": "thankyouthatscool <85291297+thankyouthatscool@users.noreply.github.com>",
+  "license": "MIT",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*"
+    ]
+  },
+  "scripts": {
+    "open:all": "yarn open:app && yarn open:server",
+    "open:app": "code ./apps/inertiion-app",
+    "open:server": "code ./apps/inertiion-server",
+    "start:containers": "cd C:/Users/ozahn/Documents/source/inertiion/apps/inertiion-server && docker compose up",
+    "start:tunnel": "cd C:/Users/ozahn/Documents/source/inertiion && ngrok http 5000"
+  }
+}
