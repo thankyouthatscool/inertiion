@@ -6,7 +6,8 @@
   "scripts": {
     "db:generate": "yarn prisma generate",
     "db:migrate": "yarn prisma migrate dev --name",
-    "dev": "yarn nodemon"
+    "dev": "yarn nodemon",
+    "open:root": "code C:/Users/ozahn/Documents/source/inertiion"
   },
   "dependencies": {
     "@prisma/client": "^4.6.1",
