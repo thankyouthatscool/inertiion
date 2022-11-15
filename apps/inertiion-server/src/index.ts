@@ -1,68 +1,69 @@
-import { PrismaClient } from "@prisma/client";
+import * as trpcExpress from "@trpc/server/adapters/express";
+import axios, { AxiosError } from "axios";
 import { config } from "dotenv";
-import { once } from "events";
-import fs from "fs";
-import path from "path";
-import readline from "readline";
+import express from "express";
+import { writeFileSync } from "fs";
+import { resolve } from "path";
+import { exit } from "process";
+
+import { appRouter } from "./rootRouter";
+import { createContext } from "./trpc";
 
 config();
 
-let items: string[] = [];
+const app = express();
 
-const prisma = new PrismaClient();
+app.use(
+  "/trpc",
+  trpcExpress.createExpressMiddleware({ router: appRouter, createContext })
+);
 
-const filterOutLine = (line: string) => {
-  const formattedLine = line
-    .split(",")
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => !!chunk)
-    .join(", ");
+const startServer = () => {
+  const PORT = process.env.SERVER_PORT || 5000;
 
-  if (formattedLine.length > 1) {
-    if (/^[A-Z]+[0-9\-]+/i.test(formattedLine)) {
-      items.push(formattedLine);
-    }
-  }
+  app.listen(PORT, () => {
+    console.log(`Server is listening on PORT ${PORT}...`);
+  });
 };
 
-const formatItemLines = (lineArray: string[]) => {
-  const lineArrayMap = lineArray.map((line) => {
-    const [item, location] = line.split(",");
-    const [code, ...description] = item.trim().split(" ");
-    const [loc] = location.trim().split(" ");
+const updateAppApiUrl = (apiUrl: string) => {
+  const appDirectory = resolve(__dirname, "../../inertiion-app");
 
-    return { code, description: description.join(" ").trim(), location: loc };
-  });
-
-  return lineArrayMap;
+  writeFileSync(resolve(appDirectory, "api.json"), JSON.stringify({ apiUrl }));
 };
 
 (async () => {
-  const rl = readline.createInterface({
-    input: fs.createReadStream(path.join(__dirname, "./data/new_loc.csv")),
-    crlfDelay: Infinity,
-  });
+  const NODE_ENV = process.env.NODE_ENV;
 
-  rl.on("line", (line) => {
-    filterOutLine(line);
-  });
+  if (NODE_ENV === "development") {
+    try {
+      const res = await axios.get("http://127.0.0.1:4040/api/tunnels");
 
-  await once(rl, "close");
+      const tunnelData = res.data.tunnels[0].public_url;
 
-  const jsonItems = formatItemLines(items);
+      updateAppApiUrl(tunnelData);
 
-  // try {
-  //   await prisma.item.createMany({
-  //     data: jsonItems.map(({ code, description, location }) => {
-  //       return { code, description, location };
-  //     }),
-  //   });
-  // } catch (e) {
-  //   console.log(e);
-  // }
+      startServer();
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        console.error(err.message);
+      } else {
+        console.log("Something else went completely wrong.");
 
-  // fs.writeFileSync(
-  //   path.join(__dirname, "./data/new_loc.json"),
-  //   JSON.stringify(jsonItems)
-  // );
+        exit(1);
+      }
+
+      console.log("Either something went wrong, or the tunnel is not running.");
+
+      exit(1);
+    }
+  } else if (NODE_ENV === "prod") {
+    console.log("running in prod");
+  } else {
+    console.log(
+      "This is something else entirely, and someone else will handle this."
+    );
+
+    exit(1);
+  }
 })();
