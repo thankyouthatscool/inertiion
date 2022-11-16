@@ -15,6 +15,11 @@ const getAllItems = publicProcedure
     }
   });
 
+export const tester = publicProcedure.input(z.string().nullable()).query(() => {
+  return { code: 200 };
+});
+
 export const itemRouter = router({
-  getAllItems: getAllItems,
+  getAllItems,
+  tester,
 });

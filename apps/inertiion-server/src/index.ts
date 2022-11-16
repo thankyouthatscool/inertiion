@@ -9,6 +9,8 @@ import { exit } from "process";
 import { appRouter } from "./rootRouter";
 import { createContext } from "./trpc";
 
+export * from "./rootRouter";
+
 config();
 
 const app = express();
