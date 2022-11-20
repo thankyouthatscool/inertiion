@@ -3,10 +3,12 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type { Item } from "./appSlice";
 
 export interface PutStockAwayState {
+  checklistItems: Item[];
   selectedItems: Item[];
 }
 
 const initialState: PutStockAwayState = {
+  checklistItems: [],
   selectedItems: [],
 };
 
@@ -26,6 +28,18 @@ export const putStockAwaySlice = createSlice({
     clearSelectedItems: (state) => {
       state.selectedItems = [];
     },
+    // Checklist items
+    addChecklistItem: (state, { payload }: PayloadAction<Item>) => {
+      state.checklistItems = [...state.checklistItems, payload];
+    },
+    removeChecklistItem: (state, { payload }: PayloadAction<Item>) => {
+      state.checklistItems = state.checklistItems.filter(
+        (item) => item.id !== payload.id
+      );
+    },
+    clearChecklistItems: (state) => {
+      state.checklistItems = [];
+    },
   },
 });
 
@@ -34,4 +48,8 @@ export const {
   addSelectedItem,
   removeSelectedItem,
   clearSelectedItems,
+  // Checklist items
+  addChecklistItem,
+  removeChecklistItem,
+  clearChecklistItems,
 } = putStockAwaySlice.actions;

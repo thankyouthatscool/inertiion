@@ -1,17 +1,18 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import {
-  Dimensions,
-  FlatList,
-  ListRenderItemInfo,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import type { ListRenderItemInfo } from "react-native";
+import { Dimensions, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DrawerScreenProps } from "@react-navigation/drawer";
+import type { CompositeScreenProps } from "@react-navigation/native";
+import {
+  createNativeStackNavigator,
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
 
 import { RootDrawerParamList } from "../../App";
 import { SearchBar } from "./components";
+import { EditItemScreen } from "../EditItemScreen";
+import { PutAwayItemsScreen } from "../PutAwayItemsScreen";
 import {
   // Selected items
   addSelectedItem,
@@ -24,18 +25,26 @@ import { APP_BACKGROUND_COLOR, APP_FONT_SIZE, APP_PADDING } from "../../theme";
 
 const { height } = Dimensions.get("window");
 
-type PutStockAwayScreenParamList = DrawerScreenProps<
-  RootDrawerParamList,
-  "PutStockAwayScreen"
+export type PutStockAwayScreenProps = {
+  EditItemScreen: { item: Item };
+  SelectItemsScreen: undefined;
+  PutAwayItemsScreen: undefined;
+};
+
+const PutStockAwayStack = createNativeStackNavigator<PutStockAwayScreenProps>();
+
+type SelectItemsScreenProps = CompositeScreenProps<
+  NativeStackScreenProps<PutStockAwayScreenProps, "SelectItemsScreen">,
+  DrawerScreenProps<RootDrawerParamList>
 >;
 
-export const PutStockAwayScreen = ({
-  navigation,
-}: PutStockAwayScreenParamList) => {
+const SelectItemsScreen = ({ navigation }: SelectItemsScreenProps) => {
   const dispatch = useAppDispatch();
 
   const { searchResult } = useAppSelector(({ app }) => app);
-  const { selectedItems } = useAppSelector(({ putStockAway }) => putStockAway);
+  const { checklistItems, selectedItems } = useAppSelector(
+    ({ putStockAway }) => putStockAway
+  );
 
   const renderCatalogItem = ({ item }: ListRenderItemInfo<Item>) => {
     return (
@@ -50,7 +59,9 @@ export const PutStockAwayScreen = ({
         style={({ pressed }) => ({
           backgroundColor: "white",
           borderColor: selectedItems.map((item) => item.id).includes(item.id)
-            ? "orange"
+            ? checklistItems.map((item) => item.id).includes(item.id)
+              ? "grey"
+              : "orange"
             : "white",
           borderRadius: APP_PADDING,
           borderWidth: 2,
@@ -97,16 +108,23 @@ export const PutStockAwayScreen = ({
           style={{ marginTop: APP_PADDING }}
         />
       </View>
-      {!!selectedItems.length && <FloatingButton />}
+      {!!selectedItems.length && (
+        <FloatingButton
+          onPress={() => {
+            navigation.navigate("PutAwayItemsScreen");
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };
 
 const FLOATING_BUTTON_SIZE = 50;
 
-const FloatingButton = () => {
+const FloatingButton = ({ onPress }: { onPress: () => void }) => {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => ({
         alignItems: "center",
 
@@ -130,5 +148,24 @@ const FloatingButton = () => {
     >
       <MaterialIcons name="east" size={APP_FONT_SIZE * 1.5} />
     </Pressable>
+  );
+};
+
+export const PutStockAwayScreen = () => {
+  return (
+    <PutStockAwayStack.Navigator screenOptions={{ headerShown: false }}>
+      <PutStockAwayStack.Screen
+        component={SelectItemsScreen}
+        name="SelectItemsScreen"
+      />
+      <PutStockAwayStack.Screen
+        component={PutAwayItemsScreen}
+        name="PutAwayItemsScreen"
+      />
+      <PutStockAwayStack.Screen
+        component={EditItemScreen}
+        name="EditItemScreen"
+      />
+    </PutStockAwayStack.Navigator>
   );
 };

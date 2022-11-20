@@ -1,5 +1,7 @@
 export * from "./appSlice";
 
+export * from "./ItemHooks";
+
 export * from "./hooks";
 
 export * from "./putStockAwaySlice";

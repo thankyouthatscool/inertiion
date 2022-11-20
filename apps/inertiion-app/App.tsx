@@ -1,6 +1,9 @@
 import "react-native-gesture-handler";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  NavigatorScreenParams,
+} from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { StatusBar } from "expo-status-bar";
@@ -10,7 +13,11 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as ReduxProvider } from "react-redux";
 
 import { apiUrl } from "./api.json";
-import { PutStockAwayScreen, SettingsScreen } from "./screens";
+import {
+  PutStockAwayScreen,
+  PutStockAwayScreenProps,
+  SettingsScreen,
+} from "./screens";
 import { store, useAppSelector } from "./store";
 import { trpc } from "./utils";
 
@@ -23,7 +30,7 @@ export const App = () => {
 };
 
 export type RootDrawerParamList = {
-  PutStockAwayScreen: undefined;
+  PutStockAwayScreen: NavigatorScreenParams<PutStockAwayScreenProps>;
   SettingsScreen: undefined;
 };
 

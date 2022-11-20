@@ -1,23 +1,26 @@
 import MaterialIcon from "@expo/vector-icons/MaterialIcons";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { CompositeNavigationProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import _throttle from "lodash.throttle";
 import { ReactNode } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { RootDrawerParamList } from "../../../../App";
+import type { PutStockAwayScreenProps } from "../../PutStockAwayScreen";
 
 import {
   setSearchTerm,
   useAppDispatch,
+  useAppSelector,
   useSearchHooks,
 } from "../../../../store";
 import { APP_FONT_SIZE, APP_PADDING } from "../../../../theme";
 
 interface SearchBarProps {
-  navigation: DrawerNavigationProp<
-    RootDrawerParamList,
-    "PutStockAwayScreen",
-    undefined
+  navigation: CompositeNavigationProp<
+    NativeStackNavigationProp<PutStockAwayScreenProps, "SelectItemsScreen">,
+    DrawerNavigationProp<RootDrawerParamList, keyof RootDrawerParamList>
   >;
 }
 
@@ -25,6 +28,8 @@ export const SearchBar = ({ navigation }: SearchBarProps) => {
   useSearchHooks();
 
   const dispatch = useAppDispatch();
+
+  const { searchTerm } = useAppSelector(({ app }) => app);
 
   const dispatchSearchTerm = _throttle((searchTerm: string) => {
     dispatch(setSearchTerm(searchTerm));
@@ -42,6 +47,7 @@ export const SearchBar = ({ navigation }: SearchBarProps) => {
             fontSize: APP_FONT_SIZE,
             padding: APP_PADDING * 1,
           }}
+          value={searchTerm}
         />
       </Card>
       <Card marginLeft>
