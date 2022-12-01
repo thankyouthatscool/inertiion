@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build:android": "eas build --platform android",
-    "start": "dotenv -e .env expo start -c",
+    "start": "dotenv -e .env -e .api.env expo start -c",
     "start:android": "expo start -c --android",
     "open:root": "code C:/Users/ozahn/Documents/source/inertiion"
   },

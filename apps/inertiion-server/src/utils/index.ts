@@ -7,6 +7,7 @@ export const updateAppApiUrl = (apiUrl: string) => {
   const appDirectory = resolve(__dirname, "../../../inertiion-app");
 
   writeFileSync(resolve(appDirectory, "api.json"), JSON.stringify({ apiUrl }));
+  writeFileSync(resolve(appDirectory, ".api.env"), `apiUrl = ${apiUrl}`);
 };
 
 export const parseDataFile = async () => {

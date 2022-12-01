@@ -11,6 +11,7 @@ module.exports = {
         projectId: "538a45f7-0e61-4134-b889-d0cf3dba6fec",
       },
       accessKeyId: process.env.accessKeyId,
+      apiUrl: process.env.apiUrl,
       bucketName: process.env.bucketName,
       secretAccessKey: process.env.secretAccessKey,
     },
