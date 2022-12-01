@@ -1,36 +1,36 @@
 import "react-native-gesture-handler";
 
-import type { DrawerContentComponentProps } from "@react-navigation/drawer";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createDrawerNavigator,
+  DrawerContentComponentProps,
   DrawerContentScrollView,
-  DrawerItem,
   DrawerItemList,
 } from "@react-navigation/drawer";
-import type { NavigatorScreenParams } from "@react-navigation/native";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  NavigatorScreenParams,
+} from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, ToastAndroid, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as ReduxProvider } from "react-redux";
 
-import { apiUrl } from "./api.json";
-import { useAppDispatch } from "@hooks/index";
+import { useAppDispatch } from "@hooks";
 import {
   InventoryScreen,
   PickOrderScreen,
   PutStockAwayScreen,
   SettingsScreen,
 } from "@screens";
-import type { PutStockAwayProps } from "./screens/PutStockAwayScreen";
-import type { Item, Order } from "@store/index";
-import { setCatalogData, setOrders, store } from "@store/index";
-import { APP_FONT_SIZE } from "@theme/index";
-import { trpc } from "@utils/index";
+import type { PutStockAwayProps } from "@screens/PutStockAwayScreen";
+import { Item, Order, setCatalogData, setOrders, store } from "@store";
+import { APP_FONT_SIZE } from "@theme";
+import { trpc } from "@utils";
+import { apiUrl } from "./api.json";
 
 export const App = () => {
   return (

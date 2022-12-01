@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface OrderItem {
+  id: string;
   itemCode: string;
   location: string;
   quantity: number;
@@ -14,10 +15,16 @@ export interface Order {
 
 export interface PickOrdersState {
   orders: Order[];
+  selectedOrders: Order[];
+  checkedOrderItems: OrderItem[];
+  selectedOrder: Order | null;
 }
 
 const initialState: PickOrdersState = {
   orders: [],
+  selectedOrders: [],
+  checkedOrderItems: [],
+  selectedOrder: null,
 };
 
 export const addOrder = createAsyncThunk(
@@ -66,8 +73,35 @@ export const pickOrdersSlice = createSlice({
   name: "pickOrders",
   initialState,
   reducers: {
+    // Orders
     setOrders: (state, { payload }: PayloadAction<Order[]>) => {
       state.orders = payload;
+    },
+
+    // Selected orders
+    setSelectedOrders: (state, { payload }: PayloadAction<Order[]>) => {
+      state.selectedOrders = payload;
+    },
+    clearSelectedOrders: (state) => {
+      state.selectedOrders = [];
+    },
+
+    //Checked order item
+    addCheckedOrderItem: (state, { payload }: PayloadAction<OrderItem>) => {
+      state.checkedOrderItems = [...state.checkedOrderItems, payload];
+    },
+    removeCheckedOrderItem: (state, { payload }: PayloadAction<OrderItem>) => {
+      state.checkedOrderItems = state.checkedOrderItems.filter(
+        (item) => item.id !== payload.id
+      );
+    },
+
+    // Selected order - for editing
+    setSelectedOrder: (state, { payload }: PayloadAction<Order>) => {
+      state.selectedOrder = payload;
+    },
+    clearSelectedOrder: (state) => {
+      state.selectedOrder = null;
     },
   },
   extraReducers: (builder) => {
@@ -82,4 +116,19 @@ export const pickOrdersSlice = createSlice({
   },
 });
 
-export const { setOrders } = pickOrdersSlice.actions;
+export const {
+  // Orders
+  setOrders,
+
+  // Selected orders
+  setSelectedOrders,
+  clearSelectedOrders,
+
+  //Checked order item
+  addCheckedOrderItem,
+  removeCheckedOrderItem,
+
+  // Selected order - for edition
+  setSelectedOrder,
+  clearSelectedOrder,
+} = pickOrdersSlice.actions;

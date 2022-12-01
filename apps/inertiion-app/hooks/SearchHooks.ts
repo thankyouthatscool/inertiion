@@ -1,8 +1,8 @@
 import _throttle from "lodash.throttle";
 import { useCallback, useEffect } from "react";
 
-import { setSearchResult } from "@store/index";
 import { useAppDispatch, useAppSelector } from "@store/hooks";
+import { setSearchResult } from "@store/index";
 
 export const useSearchHooks = () => {
   const dispatch = useAppDispatch();

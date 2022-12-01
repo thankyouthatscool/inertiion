@@ -1,7 +1,6 @@
 import "react-native-url-polyfill/auto";
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   TextractClient,
@@ -10,14 +9,18 @@ import {
 import { Buffer } from "buffer";
 import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { Control, useController, useForm } from "react-hook-form";
 import {
   Button,
   Dimensions,
   FlatList,
   ListRenderItemInfo,
   Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import {
@@ -25,19 +28,31 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import UUID from "react-native-uuid";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import { FloatingContainer, OrderItem } from "@components";
+import { FloatingContainer, OrderItem, parseItemLocation } from "@components";
 import { useAppDispatch, useAppSelector } from "@hooks";
-import { addOrder, removeOrder } from "@store";
+import {
+  addOrder,
+  removeOrder,
+  setSelectedOrder,
+  setSelectedOrders,
+} from "@store";
 import { Order } from "@store/pickOrdersSlice";
 import { APP_FONT_SIZE, APP_PADDING_SIZE } from "@theme";
 
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { CompositeScreenProps } from "@react-navigation/native";
-import { DrawerScreenProps } from "@react-navigation/drawer";
+import {
+  OrderItem as OrderItemProps,
+  addCheckedOrderItem,
+  removeCheckedOrderItem,
+} from "@store";
 
-import type { RootNavigator } from "../../App";
+import {
+  CompositeScreenProps,
+  DrawerScreenProps,
+  NativeStackScreenProps,
+  RootNavigator,
+} from "@types";
 
 enum CurrentAction {
   idle = "Idle",
@@ -49,6 +64,7 @@ const { height } = Dimensions.get("screen");
 
 export type PickOrderScreenParams = {
   AddOrderScreen: undefined;
+  EditOrder: undefined;
   PickOrderItems: undefined;
 };
 
@@ -66,6 +82,10 @@ export const PickOrderScreen = () => {
         name="AddOrderScreen"
       />
       <PickOrderScreenStack.Screen
+        component={EditOrderScreen}
+        name="EditOrder"
+      />
+      <PickOrderScreenStack.Screen
         component={PickOrderItemsScreen}
         name="PickOrderItems"
       />
@@ -73,19 +93,10 @@ export const PickOrderScreen = () => {
   );
 };
 
-type PickOrderItemsProps = CompositeScreenProps<
-  NativeStackScreenProps<PickOrderScreenParams, "PickOrderItems">,
-  DrawerScreenProps<RootNavigator>
->;
-
 type AddOrderProps = CompositeScreenProps<
   NativeStackScreenProps<PickOrderScreenParams, "AddOrderScreen">,
   DrawerScreenProps<RootNavigator>
 >;
-
-export const PickOrderItemsScreen = () => {
-  return <Text>PPP</Text>;
-};
 
 export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -152,6 +163,7 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
 
     const orderItems = itemCells?.map((cell) => {
       return {
+        id: UUID.v4() as string,
         itemCode: cell.cell.cellText!,
         location: cell.descriptionCell!,
         quantity: parseInt(cell.quantityCell!),
@@ -192,10 +204,6 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
   };
 
   const handleSelectImage = async (source: OrderSource) => {
-    // Might want to have a couple of options here:
-    // 1. Either pick an image from the gallery
-    // 2. Or take a picture with the camera -> launchCameraAsync
-
     if (source === OrderSource.gallery) {
       const imagePickerRes = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
@@ -276,6 +284,10 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
         onLongPress={() => {
           console.log("entering multi selection mode");
         }}
+        onPress={() => {
+          dispatch(setSelectedOrder(item));
+          navigation.navigate("EditOrder");
+        }}
         style={{
           backgroundColor: "white",
           borderRadius: APP_FONT_SIZE,
@@ -323,33 +335,6 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
           : "extracting data"}
       </Text>
       <View style={{ flexDirection: "row", padding: APP_PADDING_SIZE }}>
-        {/* <View style={{ flex: 1 }}>
-          <Button
-            onPress={async () => {
-              setIsLoading(() => true);
-
-              try {
-                const imageBuffer = await handleSelectImage();
-
-                const imageName = await handleUploadImage(imageBuffer);
-
-                await handleExtractText(imageName);
-
-                setIsLoading(() => false);
-                setCurrentAction(() => CurrentAction.idle);
-              } catch (e) {
-                console.log(e);
-
-                setIsLoading(() => false);
-                setCurrentAction(() => CurrentAction.idle);
-              }
-            }} 
-            title="Single Page Order"
-          />
-        </View> */}
-        {/* <View style={{ flex: 1 }}>
-          <Button disabled title="Multiple Page Order" />
-        </View> */}
         <Pressable
           onPress={() => {
             handleButtonPress(OrderSource.gallery);
@@ -423,6 +408,8 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
             </Text>
             <Button
               onPress={() => {
+                dispatch(setSelectedOrders(orders));
+
                 navigation.navigate("PickOrderItems");
               }}
               title="Pick All"
@@ -430,6 +417,602 @@ export const AddOrderScreen = ({ navigation }: AddOrderProps) => {
           </View>
         </FloatingContainer>
       )}
+    </SafeAreaView>
+  );
+};
+
+type PickOrderItemsProps = CompositeScreenProps<
+  NativeStackScreenProps<PickOrderScreenParams, "PickOrderItems">,
+  DrawerScreenProps<RootNavigator>
+>;
+
+export const PickOrderItemsScreen = ({ navigation }: PickOrderItemsProps) => {
+  const dispatch = useAppDispatch();
+
+  const { checkedOrderItems, selectedOrders } = useAppSelector(
+    ({ pickOrders }) => pickOrders
+  );
+
+  const [sortOrder, setSortOrder] = useState<string>("grace");
+  const [customOrder, setCustomOrder] = useState<{
+    [key: string]: OrderItemProps[];
+  }>({});
+
+  const { top } = useSafeAreaInsets();
+
+  useEffect(() => {
+    setCustomOrder(() =>
+      sortSelectedItems(
+        selectedOrders.reduce((acc, val) => {
+          return [...acc, ...val.orderItems];
+        }, [] as OrderItemProps[])
+      )
+    );
+  }, [selectedOrders]);
+
+  const sortSelectedItems = (selectedItems: OrderItemProps[]) => {
+    const locRemapped = selectedItems.map((item) => ({
+      ...item,
+      location: parseItemLocation(item.location)
+        .replace(/-/gi, "")
+        .replace(/100%/gi, ""),
+    }));
+
+    const warehouse2GroundLocations = locRemapped.filter((item) =>
+      /^2G/i.test(item.location)
+    );
+    const warehouse2Level1Locations = locRemapped.filter((item) =>
+      /^21/i.test(item.location)
+    );
+    const warehouse2Level2Locations = locRemapped.filter((item) =>
+      /^22/i.test(item.location)
+    );
+    const warehouse1Level1Locations = locRemapped.filter((item) =>
+      /^11/i.test(item.location)
+    );
+    const warehouse1Level2Locations = locRemapped.filter((item) =>
+      /^12/i.test(item.location)
+    );
+    const warehouse1GroundLocations = locRemapped.filter((item) =>
+      /^1G/i.test(item.location)
+    );
+    const bayLocations = locRemapped.filter((item) =>
+      /^bay/i.test(item.location)
+    );
+
+    return {
+      "2G": warehouse2GroundLocations,
+      "21": warehouse2Level1Locations,
+      "22": warehouse2Level2Locations,
+      "11": warehouse1Level1Locations,
+      "12": warehouse1Level2Locations,
+      "1G": warehouse1GroundLocations,
+      bays: bayLocations,
+    };
+  };
+
+  return (
+    <SafeAreaView style={{ height: height - (APP_PADDING_SIZE + top) }}>
+      <ScrollView overScrollMode="never" showsVerticalScrollIndicator={false}>
+        {sortOrder === "grace" && (
+          <View>
+            {/* Warehouse 2 - Level 1 */}
+            {!!customOrder?.["21"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 2 - Level 1
+                </Text>
+                {customOrder["21"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Warehouse 2 - Level 2 */}
+            {!!customOrder?.["22"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 2 - Level 2
+                </Text>
+                {customOrder["22"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Warehouse 1 - Level 1 */}
+            {!!customOrder?.["11"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 1 - Level 1
+                </Text>
+                {customOrder["11"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Warehouse 1 - Level 2 */}
+            {!!customOrder?.["12"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 1 - Level 2
+                </Text>
+                {customOrder["12"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Warehouse 2 - Ground */}
+            {!!customOrder?.["2G"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 2 - Ground
+                </Text>
+                {customOrder["2G"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Warehouse 1 - Ground */}
+            {!!customOrder?.["1G"]?.filter(
+              (item) =>
+                !checkedOrderItems.map((item) => item.id).includes(item.id)
+            ).length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Warehouse 1 - Ground
+                </Text>
+                {customOrder["1G"]
+                  .sort((a, b) => a.location.localeCompare(b.location))
+                  .filter(
+                    (item) =>
+                      !checkedOrderItems
+                        .map((item) => item.id)
+                        .includes(item.id)
+                  )
+                  .map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={({ pressed }) => ({
+                        backgroundColor: "white",
+                        borderRadius: APP_FONT_SIZE,
+
+                        elevation: pressed ? 1 : 4,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      })}
+                    >
+                      <Text>{item.quantity}</Text>
+                      <Text>{item.itemCode}</Text>
+                      <Text>{item.location}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+
+            {/* Checked */}
+            {!!checkedOrderItems.length && (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+
+                    padding: 8,
+                  }}
+                >
+                  Completed
+                </Text>
+                {checkedOrderItems.map((item) => {
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        if (
+                          !checkedOrderItems
+                            .map((item) => item.id)
+                            .includes(item.id)
+                        ) {
+                          dispatch(addCheckedOrderItem(item));
+                        } else {
+                          dispatch(removeCheckedOrderItem(item));
+                        }
+                      }}
+                      style={{
+                        backgroundColor: "gainsboro",
+                        borderRadius: APP_FONT_SIZE,
+
+                        marginHorizontal: APP_PADDING_SIZE,
+                        marginVertical: APP_PADDING_SIZE / 2,
+
+                        padding: APP_PADDING_SIZE,
+                      }}
+                    >
+                      <Text style={{ textDecorationLine: "line-through" }}>
+                        {item.quantity}
+                      </Text>
+                      <Text style={{ textDecorationLine: "line-through" }}>
+                        {item.itemCode}
+                      </Text>
+                      <Text style={{ textDecorationLine: "line-through" }}>
+                        {item.location}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+type EditOrderProps = CompositeScreenProps<
+  NativeStackScreenProps<PickOrderScreenParams, "EditOrder">,
+  DrawerScreenProps<RootNavigator>
+>;
+
+export const EditOrderScreen = ({ navigation }: EditOrderProps) => {
+  const { selectedOrder } = useAppSelector(({ pickOrders }) => pickOrders);
+
+  const { control, handleSubmit } = useForm();
+
+  return (
+    <ScreenRootWrapper>
+      <ScrollView>
+        <TextInput placeholder="quantity" value={selectedOrder?.orderId} />
+        {selectedOrder?.orderItems.map((orderItem) => {
+          return (
+            <View
+              key={orderItem.id}
+              style={[
+                {
+                  backgroundColor: "white",
+                  margin: APP_PADDING_SIZE,
+                  padding: APP_PADDING_SIZE,
+                },
+              ]}
+            >
+              <Text style={[styles.textInputLabel]}>Quantity</Text>
+              <TextInput
+                placeholder="quantity"
+                style={[styles.textInput]}
+                value={orderItem.quantity.toString()}
+              />
+              <Text style={[styles.textInputLabel]}>Description</Text>
+              <TextInput
+                placeholder="description"
+                style={[styles.textInput]}
+                value={orderItem.itemCode}
+              />
+              <Text style={[styles.textInputLabel]}>Location</Text>
+              <TextInput
+                placeholder="location"
+                style={[styles.textInput]}
+                value={orderItem.location}
+              />
+              <CustomTextInput
+                control={control}
+                defaultValue={orderItem.location}
+                name="test"
+                onChangeCallback={() => {
+                  console.log("some values have changed");
+                }}
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
+    </ScreenRootWrapper>
+  );
+};
+
+const CustomTextInput = ({
+  control,
+  defaultValue,
+  name,
+  onChangeCallback,
+  placeholder,
+}: {
+  control: Control;
+  defaultValue: string;
+  name: string;
+  onChangeCallback: () => void;
+  placeholder?: string;
+}) => {
+  const { field } = useController({ control, defaultValue, name });
+
+  return (
+    <TextInput
+      onChangeText={(e) => {
+        field.onChange(e);
+        onChangeCallback();
+      }}
+      placeholder={placeholder}
+      // style={[styles.textInput]}
+      value={field.value}
+    />
+  );
+};
+
+const styles = StyleSheet.create({
+  textInput: {
+    borderRadius: APP_FONT_SIZE,
+    borderWidth: 2,
+
+    marginRight: APP_PADDING_SIZE / 2,
+
+    padding: APP_PADDING_SIZE,
+  },
+  textInputLabel: {
+    marginVertical: APP_PADDING_SIZE / 2,
+
+    fontWeight: "bold",
+  },
+});
+
+export const ScreenRootWrapper = ({ children }: { children: ReactNode }) => {
+  const { top } = useSafeAreaInsets();
+
+  return (
+    <SafeAreaView style={{ height: height - (APP_PADDING_SIZE + top) }}>
+      {children}
     </SafeAreaView>
   );
 };

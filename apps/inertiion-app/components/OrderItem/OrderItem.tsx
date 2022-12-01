@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import type { OrderItem as OrderItemType } from "@store/pickOrdersSlice";
 import { APP_FONT_SIZE } from "@theme";
 
-const parseItemLocation = (itemLocation: string) => {
+export const parseItemLocation = (itemLocation: string) => {
   const itemLocationWords = itemLocation.split(" ");
 
   const relevantItemLocationWords = itemLocationWords.filter((word) =>

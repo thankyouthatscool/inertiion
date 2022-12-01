@@ -45,9 +45,9 @@ export const PutAwayItemsScreen = () => {
     ({ putStockAway }) => putStockAway
   );
 
-  const [itemLocations, setItemLocations] = useState<{ [key: string]: Item[] }>(
-    {}
-  );
+  const [itemLocations, setItemLocations] = useState<{
+    [key: string]: Item[];
+  }>({});
 
   useEffect(() => {
     setItemLocations(sortItems(selectedItems));
