@@ -7,7 +7,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "open:all": "yarn open:app && yarn open:server",
+    "open:all": "yarn open:app & yarn open:server",
     "open:app": "code ./apps/inertiion-app",
     "open:server": "code ./apps/inertiion-server",
     "start:containers": "cd C:/Users/ozahn/Documents/source/inertiion/apps/inertiion-server && docker compose up",
