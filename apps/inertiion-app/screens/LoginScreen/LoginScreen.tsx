@@ -2,10 +2,10 @@ import { Text } from "react-native";
 
 import { ScreenContainer } from "@components/ScreenContainer";
 
-export const SettingsScreen = () => {
+export const LoginScreen = () => {
   return (
     <ScreenContainer>
-      <Text>Settings Screen</Text>
+      <Text>Login Screen</Text>
     </ScreenContainer>
   );
 };

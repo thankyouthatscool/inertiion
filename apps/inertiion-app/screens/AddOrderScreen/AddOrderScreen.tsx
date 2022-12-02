@@ -1,11 +1,12 @@
 import { Text } from "react-native";
 
 import { ScreenContainer } from "@components/ScreenContainer";
+import type { AddOrderScreenProps } from "@types";
 
-export const SettingsScreen = () => {
+export const AddOrderScreen = ({ navigation }: AddOrderScreenProps) => {
   return (
     <ScreenContainer>
-      <Text>Settings Screen</Text>
+      <Text>Add Order Screen</Text>
     </ScreenContainer>
   );
 };

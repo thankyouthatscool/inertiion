@@ -1,17 +1,34 @@
+import {
+  ItemCode,
+  ItemDescription,
+  ItemId,
+  ItemLocation,
+  OrderId,
+  OrderItemId,
+  OrderItemQuantity,
+} from "./primitives";
+
+export * from "./primitives";
+export * from "./router";
+
 export type Item = {
-  id: string;
-  code: string;
-  description?: string;
-  location: string;
+  id: ItemId;
+  code: ItemCode;
+  description?: ItemDescription;
+  location: ItemLocation;
 };
 
 export type OrderItem = {
-  id: string;
+  id: OrderItemId;
   item: Item;
-  quantity: number;
+  quantity: OrderItemQuantity;
 };
 
 export type Order = {
-  id: string;
+  id: OrderId;
   items: OrderItem[];
+};
+
+export type AppState = {
+  searchTerm: string;
 };
